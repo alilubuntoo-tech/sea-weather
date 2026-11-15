@@ -244,7 +244,7 @@ function showHours(wd, md) {
 }
 
 // ---- Safety timer (talks to your own Cloudflare Worker) ----
-let stDeadline = null, stAlerted = false, stErr = "";
+let stDeadline = null, stAlerted = false, stErr = "", stGpsNote = "";
 const stGet = k => { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } };
 function stSetup() {
   const u = prompt("Safety server address (https://….workers.dev):", stGet("stUrl"));
@@ -274,7 +274,7 @@ function stTick() {
   if (!stDeadline) { st.textContent = "Off"; sub.textContent = "Press the button when you enter the sea."; return; }
   const t = Math.floor(Math.max(0, stDeadline - Date.now()) / 1000), p = n => String(n).padStart(2, "0");
   st.textContent = "⏱️ " + Math.floor(t / 3600) + ":" + p(Math.floor(t / 60) % 60) + ":" + p(t % 60);
-  sub.textContent = "Alert at " + new Date(stDeadline).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + " unless you press “I'm out”.";
+  sub.textContent = stGpsNote + "Alert at " + new Date(stDeadline).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + " unless you press “I'm out”.";
 }
 async function stAct(path, body) {
   try {
@@ -283,8 +283,30 @@ async function stAct(path, body) {
   } catch (e) { stErr = e.message; }
   stTick();
 }
-$("stStart").onclick = () => { const [lat, lon] = PLACES[placeSel.value];
-  stAct("/start", { minutes: +$("stDur").value, beach: placeSel.value, lat, lon }); };
+// Ask the phone for its exact GPS position (falls back to the beach's point after 15 s).
+function stGps() {
+  return new Promise(res => {
+    if (!navigator.geolocation) return res(null);
+    navigator.geolocation.getCurrentPosition(
+      p => res({ lat: +p.coords.latitude.toFixed(6), lon: +p.coords.longitude.toFixed(6), acc: Math.round(p.coords.accuracy) }),
+      () => res(null),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  });
+}
+$("stStart").onclick = async () => {
+  const btn = $("stStart"); btn.disabled = true;
+  $("stState").textContent = "📍 Getting location…";
+  $("stSub").textContent = "Allow location access if the phone asks.";
+  const gps = await stGps();
+  const [blat, blon] = PLACES[placeSel.value];
+  const body = { minutes: +$("stDur").value, beach: placeSel.value,
+    lat: gps ? gps.lat : blat, lon: gps ? gps.lon : blon, acc: gps ? gps.acc : null };
+  await stAct("/start", body);
+  btn.disabled = false;
+  stGpsNote = gps ? "📍 Exact spot saved (±" + gps.acc + " m). "
+                  : "⚠️ No GPS – alert will use the beach's general area. ";
+  stTick();
+};
 $("stExtend").onclick = () => stAct("/extend", { minutes: 30 });
 $("stStop").onclick = () => stAct("/stop");
 $("stSetup").onclick = e => { e.preventDefault(); stSetup(); };
