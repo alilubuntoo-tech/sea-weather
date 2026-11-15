@@ -52,6 +52,8 @@
   .seg { display:flex; gap:6px; margin:8px 0 10px; }
   .seg button { flex:1; padding:9px 4px; font-size:.9rem; background:transparent; color:var(--text); border:1px solid var(--muted); }
   .seg button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  #fbText { flex:3; font-size:1rem; padding:12px; border-radius:12px; border:1px solid var(--muted);
+    background:var(--card); color:var(--text); min-width:0; }
 </style>
 </head>
 <body>
@@ -103,6 +105,15 @@
 <div class="hours" id="hours"></div>
 <div class="note">These indicators are only rough estimates (offshore wind direction is approximate). Always follow lifeguards and beach flags.</div>
 <div id="status"></div>
+
+<div class="card" id="feedback" style="margin-top:14px">
+  <div class="label">What should be added?</div>
+  <div class="row">
+    <input id="fbText" type="text" maxlength="100" placeholder="Your idea (up to 100 characters)" autocomplete="off">
+    <button id="fbSend">Send</button>
+  </div>
+  <div class="sub" id="fbSub">0 / 100</div>
+</div>
 
 <script>
 // name: [land lat, land lon, sea lat, sea lon]  (waves are measured just offshore)
@@ -318,6 +329,23 @@ placeSel.addEventListener("change", load);
 $("refresh").addEventListener("click", load);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
 load();
+
+// ---- "What should be added?" box → emailed to the owner via Formspree ----
+const FEEDBACK_URL = "https://formspree.io/f/https://formspree.io/f/xbgogork";   // ← replace with your Formspree form address
+$("fbText").addEventListener("input", () => { $("fbSub").textContent = $("fbText").value.length + " / 100"; });
+$("fbSend").onclick = async () => {
+  const text = $("fbText").value.trim().slice(0, 100);
+  if (!text) { $("fbSub").textContent = "Please write something first."; return; }
+  $("fbSend").disabled = true; $("fbSub").textContent = "Sending…";
+  try {
+    const r = await fetch(FEEDBACK_URL, { method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({ suggestion: text, beach: placeSel.value, _subject: "Sea Weather suggestion" }) });
+    if (!r.ok) throw new Error(r.status);
+    $("fbText").value = ""; $("fbSub").textContent = "✅ Thank you! Your idea was sent.";
+  } catch (e) { $("fbSub").textContent = "❌ Could not send right now. Please try again later."; }
+  $("fbSend").disabled = false;
+};
 </script>
 </body>
 </html>
