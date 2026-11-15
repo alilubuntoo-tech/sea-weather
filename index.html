@@ -331,7 +331,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) load
 load();
 
 // ---- "What should be added?" box → emailed to the owner via Formspree ----
-const FEEDBACK_URL = "https://formspree.io/f/https://formspree.io/f/xbgogork";   // ← replace with your Formspree form address
+const FEEDBACK_URL = "https://formspree.io/f/xbgogork";   // ← replace with your Formspree form address
 $("fbText").addEventListener("input", () => { $("fbSub").textContent = $("fbText").value.length + " / 100"; });
 $("fbSend").onclick = async () => {
   const text = $("fbText").value.trim().slice(0, 100);
